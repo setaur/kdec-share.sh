@@ -1,13 +1,15 @@
 #!/bin/bash
 web_browser=firefox
-image_browser="eom --fullscreen"
+image_viewer="eom --fullscreen"
 download_dirname=kdec_share_show
-
 download_path="$XDG_RUNTIME_DIR/$download_dirname"
+
+self_path="$(realpath "$0" )"
 
 
 help() {
     echo -e "Share&Show script for KDE Connect Linux App
+
 Script intended to run on linux HTPC alongside KDE Connect linux app
 so it can show media shared on Android KDE Connect App on PC fullscreen.
 
@@ -18,10 +20,10 @@ If youtube-dl is not supporting that url, then it is opened by $web_browser.
 
 If shared content is a file(s), then KDEConnect Linux App downloads that 
 file to directory, which is detected by script (thanks to inotify).
-If that file is an image, then it's opened by $image_browser.
+If that file is an image, then it's opened by $image_viewer.
 If it's a video, then by smplayer.
 
-Required packages: kdeconnect, inotify-tools, smplayer, $(echo "$image_browser" | cut -d' ' -f1)
+Required packages: kdeconnect, inotify-tools, smplayer, $(echo "$image_viewer" | cut -d' ' -f1)
 
 Prepariation:
 1. Set up a connection between linux KDE Connect and android KDE Connect
@@ -33,37 +35,41 @@ $download_path
 3. Change linux default web browser to $0
 In example, in XFCE: run xfce4-settings-manager,
 In 'Preferred Applications' / 'Web Browser' choose 'Other...'
-Type '$(realpath "$0") --urlopen', click OK
+Type '$(realpath "$0") urlopen', click OK
 
 4. Run $0 --watch
 
 5. On Android: choose image/youtube link and share it with KDE Connect
 
+SYNTAX: $0 [OPTIONS] COMMAND
+
 OPTIONS:
-\t --watch 
-\t     Watch $download_path for new images and movies using inotify-watch. 
-\t     Then open it with $0 --fileopen
-
-\t --fileopen FILE 
-\t     Open FILE with smplayer, if it's a sound or movie,
-\t     or with $image_browser - if it's an image.
-
-\t --urlopen URL 
-\t     Try if URL is supported by youtube-dl. If yes - open URL with 
-\t     smplayer. If not - open URL with $web_browser
-
-\t --closeall
-\t     Close all instances of $0 --fileopen and $0 --urlopen
-\t     Can be used by Android KDE Connect Commands plugin.
-
-\t --clear-tmpdir
-\t     Removes all files downloaded to temp dir: $download_path
-
 \t -v, --verbose
 \t     Enable verbose mode
 
 \t -h, --help
-\t     Display this help."
+\t     Display this help.
+
+COMMANDS:
+\t watch 
+\t     Watch $download_path for new images and movies using inotify-watch. 
+\t     Then open it with $0 --fileopen
+
+\t fileopen FILE 
+\t     Open FILE with smplayer, if it's a sound or movie,
+\t     or with $image_viewer - if it's an image.
+
+\t urlopen URL 
+\t     Try if URL is supported by youtube-dl. If yes - open URL with 
+\t     smplayer. If not - open URL with $web_browser
+
+\t closeall
+\t     Close all instances of $0 --fileopen and $0 --urlopen
+\t     Can be used by Android KDE Connect Commands plugin.
+
+\t clear-tmpdir
+\t     Removes all files downloaded to temp dir: $download_path
+"
 }
 
 debug() {
@@ -109,8 +115,9 @@ watchdir() {
 		filepath="${download_path}/downloaded/$(basename "$file")"
 		mkdir -vp "$download_path/downloaded"
 		debug -f "$(mv -v "$file" "$filepath" )"
+		
 		debug -f "opening file $filepath..."
-		"$0" --fileopen "$filepath" &
+		"$self_path" fileopen "$filepath" &
 	    else
 		debug -f "Error downloading file '$file'"
 	    fi
@@ -137,45 +144,73 @@ clear_tmpdir() {
 fileopen() {
     local file gnufile_output
     cd "$download_path" || exit
-    file="$1"
+    for file in "$@"; do
 
-    if ! [[ -s "$file" ]]; then
-	echo "'$file' doesn't exist or empty!" >&2
-	exit 1
-    fi
+	if ! [[ -s "$file" ]]; then
+	    echo "'$file' doesn't exist or empty!" >&2
+	    exit 1
+	fi
+	
+	gnufile_output="$(file --mime --no-pad "$file" | cut -d ':' -f 2- )"
+	debug -f "${file}: ${gnufile_output}"
     
-    gnufile_output="$(file --mime --no-pad "$file" | cut -d ':' -f 2- )"
-    debug -f "${file}: ${gnufile_output}"
-    
-    if echo "$gnufile_output" |\
-	    grep -iwq 'media\|multimedia\|video\|sound'; then
-	debug -f "opening with video player..."
-	smplayer -fullscreen "$file"
-    elif echo "$gnufile_output" |\
-	    grep -iwq 'image'; then
-	debug -f "opening with image viewer"
-	$image_browser "$file"
-    else
-	echo -e "Unknown file type: '$file' \n${gnufile_output}"
-	exit 1
-    fi
-    
-
+	if echo "$gnufile_output" |\
+		grep -iwq 'media\|multimedia\|video\|sound'; then
+	    debug -f "opening with video player..."
+	    smplayer -fullscreen "$file"
+	elif echo "$gnufile_output" |\
+		grep -iwq 'image'; then
+	    debug -f "opening with image viewer"
+	    $image_viewer "$file"
+	else
+	    echo -e "Unknown file type: '$file' \n${gnufile_output}"
+	    exit 1
+	fi
+    done
 }
 
-while [ $# -gt 0 ]; do
+for arg in "$@"; do
+    case "$arg" in
+	
+
+    esac
+done
+    
+while [[ $# -gt 0 ]]; do
+    debug "processing argument $1"
     case "$1" in
-        --watch)  watchdir ;;
-        --fileopen)  fileopen "$2" ; shift;;
-	--clear-tmpdir) clear_tmpdir ;;
-        -h|--help)  help; exit;;
-	-v|--verbose) export DEBUG=1 ;;
+	-v|--verbose)
+	    export DEBUG=1
+	    debug "Verbose mode"
+	    ;;
+        -h|--help) help; exit ;;
         --)  shift; break;;
-        -*)  help           
+        -*)
+	    echo -e "Invalid parameter '$1'\n"
+	    help           
             exit 1;;
-        *)  break;;# terminate while loop
+        *)  break;;
     esac
     shift
-    # all command line switches are processed,
-    # "$@" contains all file names
 done
+
+if ! [[ "$1" ]]; then
+    echo "Need command!"
+    help
+    exit
+fi
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        watch)  watchdir ;;
+        fileopen)  shift fileopen "$@" ;;
+	clear-tmpdir) clear_tmpdir ;;
+        *)
+	    echo -e "Invalid command '$1'\n"
+	    help
+	    exit 1
+	    ;;
+    esac
+    shift
+done
+
