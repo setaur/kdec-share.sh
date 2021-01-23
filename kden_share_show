@@ -3,6 +3,7 @@ web_browser=firefox
 image_viewer="eom --fullscreen"
 download_dirname=kdec_share_show
 download_path="$XDG_RUNTIME_DIR/$download_dirname"
+downloaded_path="$download_path/downloaded"
 
 self_path="$(realpath "$0" )"
 
@@ -95,7 +96,7 @@ debug() {
 watchdir() {
     local file filepath i
     
-    debug -f "$(mkdir -vp "$download_path/downloaded" )"
+    debug -f "$(mkdir -vp "$downloaded_path" )"
     cd "$download_path" || exit
     
     while read -r file; do
@@ -112,8 +113,8 @@ watchdir() {
 
 	    if [[ -f "$file" ]]; then
 		debug -f "$file downloaded"
-		filepath="${download_path}/downloaded/$(basename "$file")"
-		mkdir -vp "$download_path/downloaded"
+		filepath="${downloaded_path}/$(basename "$file")"
+		mkdir -p "$downloaded_path"
 		debug -f "$(mv -v "$file" "$filepath" )"
 		
 		debug -f "opening file $filepath..."
@@ -139,7 +140,38 @@ clear_tmpdir() {
 
     rm -rv "${download_path:?}"/*
 }
+
+media_files=( )
+list_all_media_files() {
+    #returns array of filenames of video and audio files in dir $downloaded_path/
+    #except of FILE specified in $0 -except FILE
+    local except file gnufile_output
+    if [[ "$1" = '-except' ]]; then
+	#all but $2
+	except="$2"
+	debug -f "except $except"
+	shift 2
+    fi
+
+    cd "$downloaded_path" || exit
     
+    for file in *; do
+	gnufile_output="$(file --mime --no-pad "$file" | cut -d ':' -f 2- )"
+	debug -f "$file: $gnufile_output"
+	if echo "$gnufile_output" |\
+		grep -iwq 'media\|multimedia\|video\|sound'; then
+	    debug -f "detected $file"
+	    if [[ "$(basename $file)" = "$(basename "$except" )" ]]; then
+		debug -f "skipping $file"
+	    else
+		debug -f "adding $file"
+		media_files+=("$file")
+	    fi
+	fi
+    done
+    debug -f "completed list: ${media_files[*]}"
+}
+
 
 fileopen() {
     local file gnufile_output
@@ -157,7 +189,22 @@ fileopen() {
 	if echo "$gnufile_output" |\
 		grep -iwq 'media\|multimedia\|video\|sound'; then
 	    debug -f "opening with video player..."
-	    smplayer -fullscreen "$file"
+	    list_all_media_files -except "$file"
+
+	    if pgrep vlc >/dev/null; then
+		debug -f -n -e "\n\n$(killall -v vlc )"
+		while pgrep vlc >/dev/null; do
+		    debug -n '.'
+		    sleep 0.1
+		done
+	    fi
+
+	    debug -f "playing $file ${media_files[*]}..."
+	    vlc --one-instance \
+		--playlist-autostart \
+		--play-and-exit \
+		--verbose=0 \
+		"$file" "${media_files[@]}"
 	elif echo "$gnufile_output" |\
 		grep -iwq 'image'; then
 	    debug -f "opening with image viewer"
@@ -203,7 +250,7 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         watch)  watchdir ;;
-        fileopen)  shift fileopen "$@" ;;
+        fileopen)  shift;  fileopen "$@" ;;
 	clear-tmpdir) clear_tmpdir ;;
         *)
 	    echo -e "Invalid command '$1'\n"
