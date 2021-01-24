@@ -4,11 +4,16 @@
 web_browser=firefox
 image_viewer="eom --fullscreen"
 
-#uncomment for custom working dir:
-# download_path="$HOME/Downloads/kdec_share_show"
+#maximum size of $download_path in MB. If exceeded, oldest downloaded files will
+#be deleted, until going below limit.
+#to disable - set to 0
+max_workdir_size=300
 
-#uncomment to disable colors in verbose mode:
-#export DISABLE_COLORED_DEBUG=1                      
+#uncomment for custom working dir:
+#download_path="$HOME/Downloads/kdec_share_show"
+
+#uncomment to disable colors in verbose mode
+#export DISABLE_COLORED_DEBUG=1
 ##################################################################################
 
 self_path="$(realpath "$0" )"
@@ -20,7 +25,9 @@ self_path="$(realpath "$0" )"
 smplayer_playlist_ini="$XDG_CONFIG_HOME/smplayer/playlist.ini"
 
 [[ "$download_path" ]] || export download_path="$XDG_RUNTIME_DIR/$(basename "$0" | cut -d '.' -f1)"
-[[ "$downloaded_path" ]] || export downloaded_path="$download_path/downloaded"
+
+required_apps=(kdeconnect-cli kdeconnect-handler file "$web_browser"
+	       inotifywatch smplayer "$(echo "$image_viewer" | cut -d' ' -f1)")
 
 help() {
     echo -e "Share&Show script for KDE Connect Linux App
@@ -101,6 +108,9 @@ COMMANDS:
 "
 }
 
+DEBUG_COLOR_START="$(tput setaf 1)"
+DEBUG_COLOR_END="$(tput sgr 0)"
+[[ "$DISABLE_COLORED_DEBUG" ]] && unset DEBUG_COLOR_START DEBUG_COLOR_END
 debug() {
     #if variable DEBUG is set, then prints to stderr
     #can use standard echo parameters
@@ -117,11 +127,7 @@ debug() {
         esac
         shift
     done
-
-    local DEBUG_COLOR_START="$(tput setaf 1)"
-    local DEBUG_COLOR_END="$(tput sgr 0)"
-    [[ "$DISABLE_COLORED_DEBUG" ]] && unset DEBUG_COLOR_START DEBUG_COLOR_END
-
+    
     echo "${debug_args[@]}" "${DEBUG_COLOR_START}${debug_date}${debug_function}$*${DEBUG_COLOR_END}" >&2
 }
 
@@ -165,17 +171,93 @@ incoming_path=$download_path" > "$config_file"
 	"$0" "$@"
     fi
 }
+
+force_dir_size_limits_lock="$download_path/force_dir_size_limits.lock"
+force_dir_size_limits() {
+    #keeps size of $downloaded_path below limit by deleting
+    #oldest files, but no logs
+
+    if [[ "$1" = unlock ]]; then
+	debug -f -n "unlock: "
+	if [[ -d "$force_dir_size_limits_lock" ]]; then
+	    debug -f "lock exists, unlocking"
+	    rmdir "$force_dir_size_limits_lock"
+	else
+	    debug -f "no lock."
+	fi
+	
+	return
+
+    elif [[ "$max_workdir_size" -eq 0 ]]; then
+	debug -f "function disabled - max_workdir_size=$max_workdir_size"
+	return
+    elif [[ -e "$force_dir_size_limits_lock" ]]; then
+	debug ''
+	debug -f "another instance already running, exiting"
+	return
+    else
+	mkdir "$force_dir_size_limits_lock"
+	debug ''
+	debug -f "lock - on"
+    fi
+
+    local workdir_size i oldest_file
+    
+    i=0
+    while true; do
+	i="$((i+1))"
+	if [[ "$i" -gt 1024 ]]; then
+	    echo "$0: Error - too many iterations!" >&2
+	    exit 1
+	elif ! [[ -d "$downloaded_path" ]]; then
+	    debug -f "$(ls "$downloaded_path" )"
+	    return 1
+	fi
+	
+	workdir_size="$(du -s -m "$downloaded_path"  | awk '{print $1;}' )"
+	debug -f "workdir size = $workdir_size MB"
+	debug -f "testing if inside limits..."
+	if [[ "$workdir_size" -gt "$max_workdir_size" ]]; then
+	    #rename filenames with newline character
+	    find "${downloaded_path:?}" -name $'*\n*' -exec rename  $'s#\n# #g' '{}' \;
 	    
+	    oldest_file="$(find "${downloaded_path:?}" -type f -not -path '*/log/*' \
+	    -printf '%T+ %p\n' | sort | head -n1 | cut -d' ' -f 2-)"
+	    debug -f "oldest file: '$oldest_file'"
+	    if ! [[ -f "$oldest_file" ]]; then
+		debug -f "error: '$oldest_file' doesn't exists!"
+		break
+	    fi
 	    
+	    debug -f "$(rm -v "${oldest_file:?}" )"
+	    continue
+	    
+	else
+	    debug -f "inside limits."
+	    break
+	fi
+    done
+    
+    force_dir_size_limits unlock
+}	    
 
 watchdir() {
     local file filepath i
+
+    debug ''
+    debug -d -f 'start'
     
     prepare_dir
+    force_dir_size_limits unlock
+    force_dir_size_limits
     
     while read -r file; do
-	debug -f -d -e "\n$file detected"
+	debug ''
+	debug -f -d "$file detected"
 	if [[ "$file" =~ .part$ ]]; then
+	    
+	    force_dir_size_limits
+	    
 	    file="$(echo "$file" | sed 's#\.part$##')"
 	    debug -f "changed name: $file"
 	    for (( i=1; i<=10; i++ )); do
@@ -217,6 +299,7 @@ clear_tmpdir() {
     fi
     
     debug -f "$(rm -rv "${downloaded_path:?}" )"
+    find "${download_path:?}" -type f -iname '*.part' -print -delete
 }
 
 media_files=( )
@@ -340,7 +423,9 @@ urlopen() {
     local url target quiet_args tmpdir
 
     for url in "$@"; do
+	debug ''
 	debug -f -d "$url"
+	force_dir_size_limits
 
 	[[ "$DEBUG" ]] || quiet_args='--quiet --no-warnings'
 	
@@ -358,18 +443,22 @@ urlopen() {
 	    
 	    quiet_args=''
 	    [[ "$DEBUG" ]] || quiet_args='--quiet'
-	    
+
+	    #all this tmpdir stuff to get name of downloaded file - no easy way with wget:
 	    tmpdir="$(realpath "$(mktemp -d -p "$downloaded_path" tmpdir.XXX)" )"
 	    [[ -d "$tmpdir" ]] || continue
 	    
-	    debug -f "$(wget -nv --directory-prefix "$tmpdir" --continue "$url" 2>&1 )"
+	    debug -f "$(wget -nv --no-use-server-timestamps --directory-prefix "$tmpdir" \
+	    	     	     --continue "$url" 2>&1 )"
+	    
 	    target="$(find . -type f -not -path '*/\.*' -exec realpath {} \; )"
 	    debug -f "download: $target"
 
 	    if ! [[ -f "$target" ]]; then
 		debug -f "download failed. (target='$target')"
 		debug -f "Therefore opening url with $web_browser"
-		"$web_browser" "$url"; continue
+		"$web_browser" "$url"
+		continue
 	    else
 		debug -f "$(mv -v "$target" "$downloaded_path/" )"
 		target="${downloaded_path}/$(basename "$target" )"
@@ -394,6 +483,8 @@ Trying to open with fileopen function..."
 
 
 ##############################################################################
+
+downloaded_path="$download_path/downloaded"
     
 while [[ $# -gt 0 ]]; do
     debug "processing argument $1"
@@ -404,7 +495,7 @@ while [[ $# -gt 0 ]]; do
 	    ;;
 	-l|--logfile)
 	    logfile="$2"
-	    shift 2
+	    shift
 	    
 	    if [[ "$logfile" =~ ^'/' ]]; then
 		debug "$logfile - path absolute"
@@ -418,11 +509,15 @@ while [[ $# -gt 0 ]]; do
 	    echo "Logging all output to file '$logfile'"
 	    
 	    touch "$logfile" || exit 1
+
+	    export DISABLE_COLORED_DEBUG=1
 	    
 	    # https://serverfault.com/a/103569
+	    debug "logfile magic start"
 	    exec 3>&1 4>&2
 	    trap 'exec 2>&4 1>&3' 0 1 2 3
 	    exec 1>>"$logfile" 2>&1
+	    debug "logfile magic end"
 	    ;;
 	    
         -h|--help) help; exit ;;
@@ -434,6 +529,15 @@ while [[ $# -gt 0 ]]; do
         *)  break;;
     esac
     shift
+done
+
+for app in "${required_apps[@]}"; do
+    command -v "$app" >/dev/null 2>&1 && continue
+    
+    echo "command $app not found!"
+    echo "this script requres: ${required_apps[*]}"
+    echo "learn more: $0 --help"
+    exit 1
 done
 
 if ! [[ "$1" ]]; then
