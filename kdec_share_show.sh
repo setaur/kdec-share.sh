@@ -4,13 +4,13 @@
 web_browser=firefox
 image_viewer="eom --fullscreen"
 
-#maximum size of $download_path in MB. If exceeded, oldest downloaded files will
+#maximum size of $WORKDIR in MB. If exceeded, oldest downloaded files will
 #be deleted, until going below limit.
 #to disable - set to 0
-max_workdir_size=300
+max_workdir_size=512
 
 #uncomment for custom working dir:
-#download_path="$HOME/Downloads/kdec_share_show"
+WORKDIR="/dev/shm/$USER/$(basename "$0" | cut -d '.' -f1)"
 
 #uncomment to disable colors in verbose mode
 #export DISABLE_COLORED_DEBUG=1
@@ -27,8 +27,8 @@ self_path="$(realpath "$0" )"
 #path to smplayer 'playlist.ini' config file
 smplayer_playlist_ini="$XDG_CONFIG_HOME/smplayer/playlist.ini"
 
-[[ "$download_path" ]] ||\
-    export download_path="$XDG_RUNTIME_DIR/$(basename "$0" | cut -d '.' -f1)"
+[[ "$WORKDIR" ]] ||\
+    export WORKDIR="$XDG_RUNTIME_DIR/$(basename "$0" | cut -d '.' -f1)"
 
 required_apps=(kdeconnect-cli kdeconnect-handler file "$web_browser"
 	       inotifywatch smplayer "$(echo "$image_viewer" | cut -d' ' -f1)")
@@ -41,7 +41,7 @@ so it can show media shared on Android KDE Connect App on PC fullscreen.
 
 Script detects if shared content is a file or an url. 
 If it is a file(s), then KDEConnect Linux App downloads that 
-file to directory $download_path, which is watched by script (thanks to inotify).
+file to directory $WORKDIR, which is watched by script (thanks to inotify).
 If that file is an image, then it's opened by $image_viewer.
 If it's a video or sound then it's opened by smplayer. Multiple video/audio files 
 will be equeue in playlist. With individual video/audio file smplayer will quit at end.
@@ -60,7 +60,7 @@ Prepariation:
 
 2. In linux KDEConnect Settings/[Phone Selection]/Share and Receive/[Settings button]
 set path to dir:
-$download_path/
+$WORKDIR/
 OR use command setup-kdeconnect-plugin - see below.
 
 3. Change linux default web browser to $0
@@ -83,16 +83,16 @@ OPTIONS:
 
 \t -l FILE
 \t  --logfile FILE
-\t     If FILE is plain filename, then redirect all output to $download_path/log/FILE
+\t     If FILE is plain filename, then redirect all output to $WORKDIR/log/FILE
 \t     if FILE is full path of file, then redirect output to that file.
 
 COMMANDS:
 \t setup-kdeconnect-plugin
 \t     Set download directory in linux KDE Connect Share and Receive plugin
-\t     for ALL configured connections to $download_path
+\t     for ALL configured connections to $WORKDIR
 
 \t watch 
-\t     Watch $download_path for new images and movies using inotify-watch. 
+\t     Watch $WORKDIR for new images and movies using inotify-watch. 
 \t     Then open it with $0 fileopen
 
 \t fileopen FILE 
@@ -108,12 +108,12 @@ COMMANDS:
 \t     Can be used by Android KDE Connect Commands plugin.
 
 \t clear-tmpdir
-\t     Removes all files downloaded to temp dir: $download_path
+\t     Removes all files downloaded to temp dir: $WORKDIR
 "
 }
 
-DEBUG_COLOR_START="$(tput setaf 1)"
-DEBUG_COLOR_END="$(tput sgr 0)"
+DEBUG_COLOR_START="$(tput setaf 1 2>/dev/null)"
+DEBUG_COLOR_END="$(tput sgr 0 2>/dev/null)"
 [[ "$DISABLE_COLORED_DEBUG" ]] && unset DEBUG_COLOR_START DEBUG_COLOR_END
 debug() {
     #if variable DEBUG is set, then prints to stderr
@@ -139,8 +139,8 @@ prepare_dir() {
     local verbose_arg
     [[ "$DEBUG" ]] && verbose_arg='-v'
     
-    mkdir -p $verbose_arg "$downloaded_path"
-    cd "$download_path" || exit
+    mkdir -p $verbose_arg "$workdir_downloaded"
+    cd "$WORKDIR" || exit
 }
 
 setup_kdeconnect_plugin() {
@@ -156,14 +156,14 @@ setup_kdeconnect_plugin() {
 	    debug -f "$(mkdir -v "$dir_share" )"
 	    debug -f "file $config_file doesn't exists - creating"
 	    echo "[General]
-incoming_path=$download_path" > "$config_file"
+incoming_path=$WORKDIR" > "$config_file"
 	elif grep -q '^incoming_path=' "$config_file"; then
-	    if grep -q "^incoming_path=${download_path}/$" "$config_file"; then
+	    if grep -q "^incoming_path=${WORKDIR}/$" "$config_file"; then
 		debug -f "$config_file - already ok"
 		continue
 	    fi
 	    debug -f "file $config_file exists - modyfing"
-	    sed -i 's#^incoming_path=.*$#incoming_path='"${download_path}/#g" "$config_file"
+	    sed -i 's#^incoming_path=.*$#incoming_path='"${WORKDIR}/#g" "$config_file"
 	else
 	    debug -f "non-empty file $config_file exists, but it has strange format(?)"
 	    debug -f "renaming that file to ${config_file}.bak and creating new one"
@@ -179,9 +179,9 @@ incoming_path=$download_path" > "$config_file"
     fi
 }
 
-force_dir_size_limits_lock="$download_path/force_dir_size_limits.lock"
+force_dir_size_limits_lock="$WORKDIR/force_dir_size_limits.lock"
 force_dir_size_limits() {
-    #keeps size of $downloaded_path below limit by deleting
+    #keeps size of $workdir_downloaded below limit by deleting
     #oldest files, but no logs
 
     if [[ "$1" = unlock ]]; then
@@ -216,19 +216,19 @@ force_dir_size_limits() {
 	if [[ "$i" -gt 1024 ]]; then
 	    echo "$0: Error - too many iterations!" >&2
 	    exit 1
-	elif ! [[ -d "$downloaded_path" ]]; then
-	    debug -f "$(ls "$downloaded_path" )"
+	elif ! [[ -d "$workdir_downloaded" ]]; then
+	    debug -f "$(ls "$workdir_downloaded" )"
 	    return 1
 	fi
 	
-	workdir_size="$(du -s -m "$downloaded_path"  | awk '{print $1;}' )"
+	workdir_size="$(du -s -m "$workdir_downloaded"  | awk '{print $1;}' )"
 	debug -f "workdir size = $workdir_size MB"
 	debug -f "testing if inside limits..."
 	if [[ "$workdir_size" -gt "$max_workdir_size" ]]; then
 	    #rename filenames with newline character
-	    find "${downloaded_path:?}" -name $'*\n*' -exec rename  $'s#\n# #g' '{}' \;
+	    find "${workdir_downloaded:?}" -name $'*\n*' -exec rename  $'s#\n# #g' '{}' \;
 	    
-	    oldest_file="$(find "${downloaded_path:?}" -type f -not -path '*/log/*' \
+	    oldest_file="$(find "${workdir_downloaded:?}" -type f -not -path '*/log/*' \
 	    -printf '%T+ %p\n' | sort | head -n1 | cut -d' ' -f 2-)"
 	    debug -f "oldest file: '$oldest_file'"
 	    if ! [[ -f "$oldest_file" ]]; then
@@ -276,8 +276,8 @@ watchdir() {
 
 	    if [[ -f "$file" ]]; then
 		debug -f "$file downloaded"
-		filepath="${downloaded_path}/$(basename "$file")"
-		mkdir -p "$downloaded_path"
+		filepath="${workdir_downloaded}/$(basename "$file")"
+		mkdir -p "$workdir_downloaded"
 		debug -f "$(mv -v "$file" "$filepath" )"
 		
 		debug -f "opening file $filepath..."
@@ -293,25 +293,25 @@ watchdir() {
 		--quiet \
 		--event close_write \
 		--format %f \
-		"$download_path")
+		"$WORKDIR")
 }
 
 clear_tmpdir() {
-    if ! [[ -d "$download_path" ]]; then
-	ls "$download_path"
+    if ! [[ -d "$WORKDIR" ]]; then
+	ls "$WORKDIR"
 	exit 1
-    elif ! [[ -d "$downloaded_path" ]]; then
-	ls "$downloaded_path"
+    elif ! [[ -d "$workdir_downloaded" ]]; then
+	ls "$workdir_downloaded"
 	return 1
     fi
     
-    debug -f "$(rm -rv "${downloaded_path:?}" )"
-    find "${download_path:?}" -type f -iname '*.part' -print -delete
+    debug -f "$(rm -rv "${workdir_downloaded:?}" )"
+    find "${WORKDIR:?}" -type f -iname '*.part' -print -delete
 }
 
 media_files=( )
 list_all_media_files() {
-    #returns array of filenames of video and audio files in dir $downloaded_path/
+    #returns array of filenames of video and audio files in dir $workdir_downloaded/
     #except of FILE specified in $0 -except FILE
     local except file gnufile_output
     if [[ "$1" = '-except' ]]; then
@@ -321,7 +321,7 @@ list_all_media_files() {
 	shift 2
     fi
 
-    cd "$downloaded_path" || return
+    cd "$workdir_downloaded" || return
     
     for file in *; do
 	gnufile_output="$(file --mime --no-pad "$file" | cut -d ':' -f 2- )"
@@ -349,7 +349,7 @@ smplayer_() {
 
 fileopen() {
     local file gnufile_output
-    cd "$download_path" || exit
+    cd "$WORKDIR" || exit
     for file in "$@"; do
 	local ecode=0
 	debug -d -f -e "\n$file"
@@ -419,6 +419,7 @@ close_all() {
 	    if pgrep -P "$pid" "$cmd" >/dev/null; then
 		debug -f -n "detected $cmd - child of $pid"
 		pkill -P "$pid" "$cmd" && debug ' - killed.'
+		echo "$0: killed $pid - $cmd"
 	    fi
 	done
     done
@@ -426,7 +427,7 @@ close_all() {
 
 urlopen() {
     prepare_dir
-    cd "$downloaded_path" || return
+    cd "$workdir_downloaded" || return
     local url target quiet_args tmpdir
 
     for url in "$@"; do
@@ -452,26 +453,26 @@ urlopen() {
 	    [[ "$DEBUG" ]] || quiet_args='--quiet'
 
 	    #all this tmpdir stuff to get name of downloaded file - no easy way with wget:
-	    tmpdir="$(realpath "$(mktemp -d -p "$downloaded_path" tmpdir.XXX)" )"
+	    tmpdir="$(realpath "$(mktemp -d -p "$workdir_downloaded" tmpdir.XXX)" )"
 	    [[ -d "$tmpdir" ]] || continue
 	    
 	    debug -f "$(wget -nv --no-use-server-timestamps --directory-prefix "$tmpdir" \
 	    	     	     --continue "$url" 2>&1 )"
 	    
-	    target="$(find . -type f -not -path '*/\.*' -exec realpath {} \; )"
+	    target="$(find "$tmpdir" -type f -not -path '*/\.*' -exec realpath {} \; )"
 	    debug -f "download: $target"
 
 	    if ! [[ -f "$target" ]]; then
 		debug -f "download failed. (target='$target')"
+		rmdir "$tmpdir" || rm -r "${tmpdir:?}"; unset tmpdir
 		debug -f "Therefore opening url with $web_browser"
 		"$web_browser" "$url"
 		continue
 	    else
-		debug -f "$(mv -v "$target" "$downloaded_path/" )"
-		target="${downloaded_path}/$(basename "$target" )"
+		debug -f "$(mv -v "$target" "$workdir_downloaded/" )"
+		target="${workdir_downloaded}/$(basename "$target" )"
 		debug -f "now target='$target'"
-		rmdir "$tmpdir" || rm -r "$tmpdir"
-		unset tmpdir
+		rmdir "$tmpdir" || rm -r "${tmpdir:?}"; unset tmpdir
 		
 		debug -f "downloaded to $target.
 Trying to open with fileopen function..."
@@ -491,7 +492,7 @@ Trying to open with fileopen function..."
 
 ##############################################################################
 
-downloaded_path="$download_path/downloaded"
+workdir_downloaded="$WORKDIR/downloaded"
     
 while [[ $# -gt 0 ]]; do
     debug "processing argument $1"
@@ -508,7 +509,7 @@ while [[ $# -gt 0 ]]; do
 		debug "$logfile - path absolute"
 	    else
 		debug "$logfile - plain filename."
-		logfile="${download_path}/log/${logfile}"
+		logfile="${WORKDIR}/log/${logfile}"
 		debug "changed to $logfile."
 		prepare_dir
 		mkdir -p "$(dirname "$logfile" )" || exit
