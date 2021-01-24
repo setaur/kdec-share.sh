@@ -14,6 +14,9 @@ max_workdir_size=300
 
 #uncomment to disable colors in verbose mode
 #export DISABLE_COLORED_DEBUG=1
+
+#default DISPLAY
+export DISPLAY=:0
 ##################################################################################
 
 self_path="$(realpath "$0" )"
@@ -24,7 +27,8 @@ self_path="$(realpath "$0" )"
 #path to smplayer 'playlist.ini' config file
 smplayer_playlist_ini="$XDG_CONFIG_HOME/smplayer/playlist.ini"
 
-[[ "$download_path" ]] || export download_path="$XDG_RUNTIME_DIR/$(basename "$0" | cut -d '.' -f1)"
+[[ "$download_path" ]] ||\
+    export download_path="$XDG_RUNTIME_DIR/$(basename "$0" | cut -d '.' -f1)"
 
 required_apps=(kdeconnect-cli kdeconnect-handler file "$web_browser"
 	       inotifywatch smplayer "$(echo "$image_viewer" | cut -d' ' -f1)")
@@ -132,7 +136,10 @@ debug() {
 }
 
 prepare_dir() {
-    debug -f "$(mkdir -vp "$downloaded_path" )"
+    local verbose_arg
+    [[ "$DEBUG" ]] && verbose_arg='-v'
+    
+    mkdir -p $verbose_arg "$downloaded_path"
     cd "$download_path" || exit
 }
 
@@ -511,13 +518,18 @@ while [[ $# -gt 0 ]]; do
 	    touch "$logfile" || exit 1
 
 	    export DISABLE_COLORED_DEBUG=1
+
+	    shift #remove both logging arguments
+	    debug "starting again in next instance"
+	    eval "$self_path" "$@" >> "$logfile" 2>&1
+	    exit
 	    
 	    # https://serverfault.com/a/103569
-	    debug "logfile magic start"
-	    exec 3>&1 4>&2
-	    trap 'exec 2>&4 1>&3' 0 1 2 3
-	    exec 1>>"$logfile" 2>&1
-	    debug "logfile magic end"
+	    #debug "logfile magic start"
+	    #exec 3>&1 4>&2
+	    #trap 'exec 2>&4 1>&3' 0 1 2 3
+	    #exec 1>>"$logfile" 2>&1
+	    #debug "logfile magic end"
 	    ;;
 	    
         -h|--help) help; exit ;;
