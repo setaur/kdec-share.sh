@@ -33,7 +33,7 @@ smplayer_playlist_ini="$XDG_CONFIG_HOME/smplayer/playlist.ini"
 required_apps=(kdeconnect-cli kdeconnect-handler file "$web_browser"
 	       inotifywatch smplayer "$(echo "$image_viewer" | cut -d' ' -f1)")
 
-help() {
+longhelp() {
     echo -e "Share&Show script for KDE Connect Linux App
 
 Script intended to run on linux HTPC alongside KDE Connect linux app
@@ -41,10 +41,11 @@ so it can show media shared on Android KDE Connect App on PC fullscreen.
 
 Script detects if shared content is a file or an url. 
 If it is a file(s), then KDEConnect Linux App downloads that 
-file to directory $WORKDIR, which is watched by script (thanks to inotify).
+file to directory $WORKDIR, which is watched by 
+script (thanks to inotify).
 If that file is an image, then it's opened by $image_viewer.
-If it's a video or sound then it's opened by smplayer. Multiple video/audio files 
-will be equeue in playlist. With individual video/audio file smplayer will quit at end.
+If it's a video or sound then it's opened by smplayer. Multiple media files 
+will be equeue in playlist. With individual media file smplayer will quit at end.
 With several media files, smplayer will keep playlist at repeat.
 
 If shared content is an url, then script checks if this url can be opened by youtube-dl. 
@@ -66,13 +67,17 @@ OR use command setup-kdeconnect-plugin - see below.
 3. Change linux default web browser to $0
 In example, in XFCE: run xfce4-settings-manager,
 In 'Preferred Applications' / 'Web Browser' choose 'Other...'
-Type '$(realpath "$0") urlopen', click OK
+Type: 
+ $(realpath "$0") urlopen \"%s\"
+and click OK.
 
 4. Run $0 --watch
 
-5. On Android: choose image/video file(s) or image/video/youtube link and share it with KDE Connect
+5. On Android: choose image/video file(s) or image/video/youtube link and share it with KDE Connect"
+}
 
-SYNTAX: $0 [OPTIONS] COMMAND
+help() {
+    echo -e "SYNTAX: $0 [OPTIONS] COMMAND
 
 OPTIONS:
 \t -v, --verbose
@@ -81,10 +86,13 @@ OPTIONS:
 \t -h, --help
 \t     Display this help.
 
-\t -l FILE
-\t  --logfile FILE
-\t     If FILE is plain filename, then redirect all output to $WORKDIR/log/FILE
-\t     if FILE is full path of file, then redirect output to that file.
+\t -H, --longhelp
+\t     Display longer help: required preparation steps, principle of operation
+
+\t -l FILE, --logfile FILE
+\t     If FILE is plain filename, then redirect all output to 
+\t\t     $WORKDIR/log/FILE
+\t     if FILE is full path to a file, then redirect output to that path.
 
 COMMANDS:
 \t setup-kdeconnect-plugin
@@ -92,19 +100,21 @@ COMMANDS:
 \t     for ALL configured connections to $WORKDIR
 
 \t watch 
-\t     Watch $WORKDIR for new images and movies using inotify-watch. 
-\t     Then open it with $0 fileopen
+\t     Watch $WORKDIR for new images and movies using 
+\t     inotify-watch. Then open it with '$0 fileopen'
 
 \t fileopen FILE 
 \t     Open FILE with smplayer, if it's a sound or movie,
-\t     or with $image_viewer - if it's an image.
+\t     or with '$image_viewer' - if it's an image.
 
 \t urlopen URL 
 \t     Try if URL is supported by youtube-dl. If yes - open URL with 
-\t     smplayer. If not - open URL with $web_browser
+\t     smplayer. If not and it's an image - open with '$image_viewer'. 
+\t     Otherwise open URL with $web_browser
 
 \t closeall
-\t     Close all instances of $0 fileopen and $0 urlopen
+\t     Close all instances of '$0 fileopen' 
+\t     and '$0 urlopen'
 \t     Can be used by Android KDE Connect Commands plugin.
 
 \t clear-tmpdir
@@ -534,6 +544,7 @@ while [[ $# -gt 0 ]]; do
 	    ;;
 	    
         -h|--help) help; exit ;;
+	-H|--longhelp) longhelp; help; exit ;;
         --)  shift; break;;
         -*)
 	    echo -e "Invalid parameter '$1'\n"
@@ -549,7 +560,7 @@ for app in "${required_apps[@]}"; do
     
     echo "command $app not found!"
     echo "this script requres: ${required_apps[*]}"
-    echo "learn more: $0 --help"
+    echo "learn more: $0 --longhelp"
     exit 1
 done
 
@@ -561,7 +572,10 @@ fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-	setup-kdeconnect-plugin) setup_kdeconnect_plugin ;;
+	setup-kdeconnect-plugin)
+	    export DEBUG=1
+	    setup_kdeconnect_plugin
+	    ;;
         watch)  watchdir ;;
         fileopen)  shift;  fileopen "$@" ;;
 	urlopen) shift; urlopen "$@" ;;
