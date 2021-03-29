@@ -6,7 +6,7 @@ image_viewer="eom --fullscreen"
 
 #maximum size of $WORKDIR in MB. If exceeded, oldest downloaded files will
 #be deleted, until going below limit.
-#to disable - set to 0
+#Set to 0 to disable
 max_workdir_size=512
 
 #uncomment for custom working dir:
@@ -106,6 +106,9 @@ COMMANDS:
 \t fileopen FILE 
 \t     Open FILE with smplayer, if it's a sound or movie,
 \t     or with '$image_viewer' - if it's an image.
+
+\t open-last-mediafile
+\t     Open last uploaded media file.
 
 \t urlopen URL 
 \t     Try if URL is supported by youtube-dl. If yes - open URL with 
@@ -350,6 +353,37 @@ list_all_media_files() {
     debug -f "completed list: ${media_files[*]}"
 }
 
+open_last_mediafile() {
+    local mediafile mediafile_newest unixtime unixtime_newest
+    cd "$workdir_downloaded" || exit
+    list_all_media_files
+    if [[ "${#media_files[@]}" -eq 0 ]]; then
+	    debug -f 'no media files'
+	    return
+	   
+    elif [[ "${#media_files[@]}" -eq 1 ]]; then
+	mediafile_newest="${media_files[0]}"
+	debug -f "only one media file"
+    else
+	debug -f "multiple files - searching for the newest"
+
+	unixtime_newest=0
+	for mediafile in "${media_files[@]}"; do
+	    unixtime="$(date -d "$(stat -c %y "$mediafile" )" +"%s" )"
+	    if [[ "$unixtime" -gt "$unixtime_newest" ]]; then
+		unixtime_newest="$unixtime"
+		mediafile_newest="$mediafile"
+		debug -f "founded the newest mediafile: '$mediafile'"
+	    fi
+	done
+	
+    fi
+
+    debug -f "opening '$mediafile_newest'"
+    fileopen "$workdir_downloaded/$mediafile_newest"
+}
+    
+
 smplayer_() {
     smplayer \
 	-close-at-end \
@@ -415,8 +449,9 @@ close_all() {
     local image_viewer_name cmd pid
     local ppids=( )
     image_viewer_name="$(echo "$image_viewer" | cut -d' ' -f1)"
+    debug -f 'Closing all viewers'
 
-    for cmd in fileopen urlopen; do
+    for cmd in fileopen open-last-mediafile urlopen; do
 	pid="$(pgrep --full "$(basename "$0" ) $cmd" )"
 	if [[ "$pid" ]]; then
 	    debug -f "found parent pid: $pid"
@@ -578,6 +613,7 @@ while [[ $# -gt 0 ]]; do
 	    ;;
         watch)  watchdir ;;
         fileopen)  shift;  fileopen "$@" ;;
+	open-last-mediafile) open_last_mediafile ;;
 	urlopen) shift; urlopen "$@" ;;
 	closeall) close_all ;;
 	clear-tmpdir) clear_tmpdir ;;
