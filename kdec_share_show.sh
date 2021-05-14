@@ -485,7 +485,7 @@ urlopen() {
 	debug -f "Trying youtube-dl..."
 	if youtube-dl $quiet_args \
 		      --simulate \
-		      --format worstvideo \
+		      --format 'worstvideo/worst' \
 		      "$url"; then
 	    
 	    debug -f "youtube-dl checks. Trying smplayer..."
