@@ -18,8 +18,9 @@ Script detects if shared content is a file uploaded from a smartphone or an url.
 
 * If shared content is an url, then script checks if this url can be opened by youtube-dl.
   * If that's passable, then url is opened by Smplayer (which uses youtube-dl).
-  * If youtube-dl is not supporting that url, then it is downloaded and if it turns out to be an image, sound or video - script is progressing in the same way as with shared file.
-  * If it's not image, sound or video, then url is opened by $web_browser (default: firefox).
+  * If youtube-dl is not supporting that url, then it is downloaded.
+    * If it turns out to be an image, sound or video - script is progressing in the same way as with shared file.
+    * If it's not image, sound or video, then url is opened by $web_browser (default: firefox).
 
 ## Required packages
 kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
@@ -27,11 +28,11 @@ kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
 ## Setup
 1. Set up a connection between linux KDE Connect and android KDE Connect
 
-2. Download kdec-share.sh 
+2. Download kdec-share.sh, run `chmod +x kdec-share.sh`
 
 3. In linux KDEConnect Settings/[Phone Selection]/Share and Receive/[Settings button] set path to dir:
 * $WORKDIR (run ./kdec-share.sh -H to resolve that variable)
-* OR use command setup-kdeconnect-plugin - see below.
+* or use command `kdec-share.sh setup-kdeconnect-plugin` - see [below](#commands).
 
 4. Change linux default web browser to 'PATH/TO/kdec-share.sh urlopen'
 * In example, in XFCE: 
@@ -47,10 +48,12 @@ kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
 * share it with KDE Connect
 * it should be displayed on a PC screen.
 
-# SYNTAX: 
+___
+
+# SYNTAX 
 ### kdec-share.sh [OPTIONS] COMMAND
 
-## OPTIONS:
+## OPTIONS
 	 -v, --verbose
 	     Enable verbose mode
 
@@ -65,7 +68,7 @@ kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
 		     $WORKDIR/log/FILE
 	     if FILE is full path to a file, then redirect output to that path.
 
-## COMMANDS:
+## COMMANDS
 	 setup-kdeconnect-plugin
 	     Set download directory in linux KDE Connect Share and Receive plugin
 	     for ALL configured connections to $WORKDIR
