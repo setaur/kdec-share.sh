@@ -7,7 +7,7 @@ By default when you share something in KDE Connect mobile app, it will work one 
 * If shared content is a file saved in smartphone memory (in example a photo), then that file will be uploaded to PC into folder set in KDE Connect linux app settings.
 * If shared content is an url (in example to youtube video), then KDE Connect opens that url on PC with default browser.
 
-To capture both of this ways user of this script has to change KDE Connect Linux App default file receive directory, and Linux default browser.
+To capture both of this ways user of this script has to change KDE Connect Linux App default file receive directory, and Linux default browser (more in [Setup](#setup)).
 
 Script detects if shared content is a file uploaded from a smartphone or an url. 
 * If it is a file(s), then KDEConnect Linux App downloads that file to directory $WORKDIR, which is watched by script (thanks to inotify).
@@ -27,20 +27,22 @@ kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
 ## Setup
 1. Set up a connection between linux KDE Connect and android KDE Connect
 
-2. In linux KDEConnect Settings/[Phone Selection]/Share and Receive/[Settings button] set path to dir:
+2. Download kdec-share.sh 
+
+3. In linux KDEConnect Settings/[Phone Selection]/Share and Receive/[Settings button] set path to dir:
 * $WORKDIR (run ./kdec-share.sh -H to resolve that variable)
 * OR use command setup-kdeconnect-plugin - see below.
 
-3. Change linux default web browser to 'PATH/TO/kdec-share.sh urlopen'
+4. Change linux default web browser to 'PATH/TO/kdec-share.sh urlopen'
 * In example, in XFCE: 
   * run xfce4-settings-manager,
   * In 'Preferred Applications' / 'Web Browser' choose 'Other...'
   * Type: `/PATH/TO/kdec-share.sh urlopen "%s"` (of course fix the path)
   * Click OK.
 
-4. Run `PATH/TO/kdec-share.sh --watch`
+5. Run `PATH/TO/kdec-share.sh --watch`
 
-5. On Android: 
+6. On Android: 
 * choose image/video file(s) from internal memory or image/video/youtube link 
 * share it with KDE Connect
 * it should be displayed on a PC screen.
