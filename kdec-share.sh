@@ -1,6 +1,8 @@
 #!/bin/bash
+
 ##################################################################################
-#customizable:
+#CUSTOMIZABLE:
+
 web_browser=firefox
 image_viewer="eom --fullscreen"
 
@@ -17,6 +19,7 @@ WORKDIR="/dev/shm/$USER/$(basename "$0" | cut -d '.' -f1)"
 
 #default DISPLAY
 export DISPLAY=:0
+
 ##################################################################################
 
 self_path="$(realpath "$0" )"
@@ -31,13 +34,15 @@ smplayer_playlist_ini="$XDG_CONFIG_HOME/smplayer/playlist.ini"
     export WORKDIR="$XDG_RUNTIME_DIR/$(basename "$0" | cut -d '.' -f1)"
 
 required_apps=(kdeconnect-cli kdeconnect-handler file "$web_browser"
-	       inotifywatch smplayer "$(echo "$image_viewer" | cut -d' ' -f1)")
+	       inotifywatch smplayer youtube-dl "$(echo "$image_viewer" | cut -d' ' -f1)")
 
 longhelp() {
     echo -e "Share&Show script for KDE Connect Linux App
 
 Script intended to run on linux HTPC alongside KDE Connect linux app
 so it can show media shared on Android KDE Connect App on PC fullscreen.
+It will show both photos and videos from smartphone memory and
+shared hiperlinks to photos and videos from the internet.
 
 Script detects if shared content is a file or an url. 
 If it is a file(s), then KDEConnect Linux App downloads that 
@@ -54,7 +59,7 @@ If youtube-dl is not supporting that url, then it is downloaded and if it turns 
 to be an image, sound or video - script is progressing in the same way as with shared
 file. If not - url is opened by $web_browser.
 
-Required packages: kdeconnect, file, inotify-tools, smplayer, $(echo "$image_viewer" | cut -d' ' -f1)
+Required packages: kdeconnect, file, inotify-tools, smplayer, youtube-dl, $(echo "$image_viewer" | cut -d' ' -f1)
 
 Prepariation:
 1. Set up a connection between linux KDE Connect and android KDE Connect
@@ -64,7 +69,7 @@ set path to dir:
 $WORKDIR/
 OR use command setup-kdeconnect-plugin - see below.
 
-3. Change linux default web browser to $0
+3. Change linux default web browser to '$0 urlopen'
 In example, in XFCE: run xfce4-settings-manager,
 In 'Preferred Applications' / 'Web Browser' choose 'Other...'
 Type: 
@@ -73,7 +78,9 @@ and click OK.
 
 4. Run $0 --watch
 
-5. On Android: choose image/video file(s) or image/video/youtube link and share it with KDE Connect"
+5. On Android: choose image/video file(s) from internal memory or image/video/youtube link and share it 
+with KDE Connect
+"
 }
 
 help() {
@@ -187,7 +194,7 @@ incoming_path=$WORKDIR" > "$config_file"
 
     if [[ "$recursion" ]]; then
 	unset recursion
-	debug -f "recursion... oh shit here we go again!"
+	debug -f "recursion... oh shit, here we go again!"
 	"$0" "$@"
     fi
 }
@@ -226,7 +233,7 @@ force_dir_size_limits() {
     i=0
     while true; do
 	i="$((i+1))"
-	if [[ "$i" -gt 1024 ]]; then
+	if [[ "$i" -gt 10240 ]]; then
 	    echo "$0: Error - too many iterations!" >&2
 	    exit 1
 	elif ! [[ -d "$workdir_downloaded" ]]; then
@@ -325,7 +332,7 @@ clear_tmpdir() {
 media_files=( )
 list_all_media_files() {
     #returns array of filenames of video and audio files in dir $workdir_downloaded/
-    #except of FILE specified in $0 -except FILE
+    #except of FILE specified in '$0 -except FILE'
     local except file gnufile_output
     if [[ "$1" = '-except' ]]; then
 	#all but $2
@@ -430,6 +437,8 @@ fileopen() {
 	    
 	    debug -f "playing $file ${media_files[*]}..."
 	    smplayer_ "$file" "${media_files[@]}"
+	    # $file will be played first in a playlist
+	    
 	elif echo "$gnufile_output" |\
 		grep -iwq 'image'; then
 	    debug -f "opening with image viewer"
