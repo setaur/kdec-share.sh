@@ -40,7 +40,7 @@ longhelp() {
     echo -e "Share&Show script for KDE Connect Linux App
 
 Script intended to run on linux HTPC alongside KDE Connect linux app
-so it can show media shared on Android KDE Connect App on PC fullscreen.
+so it can show media shared from Android KDE Connect App on PC fullscreen.
 It will show both photos and videos from smartphone memory and
 shared hiperlinks to photos and videos from the internet.
 
