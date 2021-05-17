@@ -12,7 +12,7 @@ image_viewer="eom --fullscreen"
 max_workdir_size=512
 
 #uncomment for custom working dir:
-WORKDIR="/dev/shm/$USER/$(basename "$0" | cut -d '.' -f1)"
+#WORKDIR="/dev/shm/$USER/$(basename "$0" | cut -d '.' -f1)"
 
 #uncomment to disable colors in verbose mode
 #export DISABLE_COLORED_DEBUG=1
