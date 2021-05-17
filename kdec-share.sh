@@ -61,7 +61,7 @@ file. If not - url is opened by $web_browser.
 
 Required packages: kdeconnect, file, inotify-tools, smplayer, youtube-dl, $(echo "$image_viewer" | cut -d' ' -f1)
 
-Prepariation:
+Setup:
 1. Set up a connection between linux KDE Connect and android KDE Connect
 
 2. In linux KDEConnect Settings/[Phone Selection]/Share and Receive/[Settings button]
