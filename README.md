@@ -39,10 +39,10 @@ kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
 * In example, in XFCE: 
   * run xfce4-settings-manager,
   * In 'Preferred Applications' / 'Web Browser' choose 'Other...'
-  * Type: `/PATH/TO/kdec-share.sh urlopen "%s"` (of course fix the path)
+  * Type: `/PATH/TO/kdec-share.sh urlopen "%s"` (ofcourse fix the path)
   * Click OK.
 
-5. Run `PATH/TO/kdec-share.sh --watch`
+5. Run `/PATH/TO/kdec-share.sh --watch`
 
 6. On Android: 
 * choose image/video file(s) from internal memory or image/video/youtube link 
