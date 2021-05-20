@@ -76,7 +76,7 @@ Type:
  $(realpath "$0") urlopen \"%s\"
 and click OK.
 
-4. Run $0 --watch
+4. Run $0 watch
 
 5. On Android: choose image/video file(s) from internal memory or image/video/youtube link and share it 
 with KDE Connect
