@@ -32,7 +32,7 @@ kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
 2. Download kdec-share.sh, run `chmod +x kdec-share.sh`
 
 3. In linux KDEConnect Settings/[Phone Selection]/Share and Receive/[Settings button] set path to dir:
-* $WORKDIR (run ./kdec-share.sh -H to resolve that variable)
+* $WORKDIR (run `./kdec-share.sh -H` to resolve that variable)
 * or use command `kdec-share.sh setup-kdeconnect-plugin` - see [below](#commands).
 
 4. Change linux default web browser to 'PATH/TO/kdec-share.sh urlopen'
@@ -42,7 +42,7 @@ kdeconnect, file, inotify-tools, smplayer, youtube-dl, eom
   * Type: `/PATH/TO/kdec-share.sh urlopen "%s"` (ofcourse fix the path)
   * Click OK.
 
-5. Run `/PATH/TO/kdec-share.sh --watch`
+5. Run `/PATH/TO/kdec-share.sh watch`
 
 6. On Android: 
 * choose image/video file(s) from internal memory or image/video/youtube link 
