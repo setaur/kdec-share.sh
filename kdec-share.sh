@@ -84,7 +84,7 @@ with KDE Connect
 }
 
 help() {
-    echo -e "SYNTAX: $0 [OPTIONS] COMMAND
+    echo -e "SYNTAX: $0 [OPTIONS] COMMAND|FILE|URL
 
 OPTIONS:
 \t -v, --verbose
@@ -627,9 +627,15 @@ while [[ $# -gt 0 ]]; do
 	closeall) close_all ;;
 	clear-tmpdir) clear_tmpdir ;;
         *)
-	    echo -e "Invalid command '$1'\n"
-	    help
-	    exit 1
+	    if [[ "$1" =~ ^http[s]?'://' ]]; then
+		urlopen "$1"
+	    elif [[ -f "$1" ]]; then
+		fileopen "$1"
+	    else
+		echo -e "Not a command, filename or url: '$1'\n"
+		help
+		exit 1
+	    fi
 	    ;;
     esac
     shift
