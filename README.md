@@ -1,10 +1,10 @@
 # kdec-share.sh
 ## Share&Show Bash script for KDE Connect Linux App
-Script intended to run on linux HTPC alongside KDE Connect. It will show media shared on mobile with KDE Connect App on PC fullscreen. 
+Script intended to run on linux HTPC (Home Theater Personal Computer), alongside KDE Connect. It will show media shared on mobile with KDE Connect App on PC fullscreen. 
 Script shows both photos and videos from smartphone memory and shared internet hyperlinks to photos and videos.
 
 ## Principle of operation
-By default when you share something in KDE Connect mobile app, it will work one of two ways:
+By default when you share something in KDE Connect mobile app, it will work in one of two ways:
 * If shared content is a file saved in smartphone memory (in example a photo), then that file will be uploaded to PC into folder set in KDE Connect linux app settings.
 * If shared content is an url (in example to youtube video), then KDE Connect opens that url on PC with default browser.
 
